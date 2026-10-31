@@ -591,7 +591,11 @@ class GraduationProject(models.Model):
 
     @property
     def supervisor_score_is_draft(self):
-        return False
+        return getattr(self, "_supervisor_score_is_draft", False)
+
+    @supervisor_score_is_draft.setter
+    def supervisor_score_is_draft(self, value):
+        self._supervisor_score_is_draft = bool(value)
 
     @property
     def reviewer_verdict(self):
