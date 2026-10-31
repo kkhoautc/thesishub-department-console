@@ -138,6 +138,27 @@ export const DefenseManagementPage: React.FC = () => {
     }
   };
 
+  const handleDownloadBienBanPdf = async () => {
+    if (!selectedCouncilId) {
+      alert('Vui lòng chọn một Hội đồng cụ thể để xuất Biên bản họp bảo vệ PDF!');
+      return;
+    }
+    try {
+      const res = await apiClient.get(`/admin/councils/${selectedCouncilId}/export-minutes-pdf/`, {
+        responseType: 'blob',
+      });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Bien_ban_HD_${selectedCouncilId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Lỗi tải file Biên bản PDF: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const handleDownloadFinalSummaryExcel = async () => {
     if (!selectedBatchId) return;
     try {
@@ -306,7 +327,17 @@ export const DefenseManagementPage: React.FC = () => {
               className="utc-btn-emerald-outline"
               title="Xuất file Biên bản chấm điểm Excel của Hội đồng"
             >
-              <span>📊</span> Xuất Bảng Điểm HĐ (Excel)
+              <span>📊</span> Bảng Điểm HĐ (Excel)
+            </button>
+
+            <button
+              onClick={handleDownloadBienBanPdf}
+              disabled={!selectedCouncilId}
+              className="utc-btn-red-outline"
+              style={{ background: '#fff', border: '1px solid #ef4444', color: '#dc2626', padding: '0.5rem 0.85rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              title="Xuất Biên bản họp bảo vệ PDF có chữ ký điện tử"
+            >
+              <span>📑</span> Biên Bản Bảo Vệ (PDF)
             </button>
 
             <button

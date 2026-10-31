@@ -978,7 +978,13 @@ class FinalGradeSummary(models.Model):
         s_rev = self.reviewer_score or 0.0
         s_cou = self.council_avg_score or 0.0
 
-        score10 = round((s_sup * w_sup) + (s_rev * w_rev) + (s_cou * w_cou), 2)
+        if self.reviewer_score is not None and w_rev > 0:
+            score10 = round((s_sup * w_sup) + (s_rev * w_rev) + (s_cou * w_cou), 2)
+        else:
+            # GĐ 6 yeucau.md: Điểm tổng kết ĐATN kết hợp giữa Điểm quá trình (GVHD) và Điểm hội đồng
+            norm = (w_sup + w_cou) if (w_sup + w_cou) > 0 else 1.0
+            score10 = round(((s_sup * w_sup) + (s_cou * w_cou)) / norm, 2)
+
         self.final_score_10 = score10
 
         # Thang 4 & Điểm chữ theo Quy chế UTC

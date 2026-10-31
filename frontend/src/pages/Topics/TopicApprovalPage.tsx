@@ -24,10 +24,6 @@ export const TopicApprovalPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
-  // Modal Request Revision
-  const [revisionProject, setRevisionProject] = useState<ProjectTopic | null>(null);
-  const [revisionNotes, setRevisionNotes] = useState('');
-
   const fetchBatches = async () => {
     try {
       const res = await apiClient.get('/admin/batches/');
@@ -66,40 +62,7 @@ export const TopicApprovalPage: React.FC = () => {
     }
   }, [selectedBatchId]);
 
-  const handleApprove = async (projId: number) => {
-    if (!confirm('Khoa xác nhận PHÊ DUYỆT đề tài tốt nghiệp này? Sau khi duyệt, hệ thống sẽ mở quyền sinh Phiếu giao đề tài/Đề cương.')) return;
-    try {
-      await apiClient.patch(`/admin/projects/${projId}/topic-approval/`, {
-        decision: 'APPROVE',
-      });
-      alert('Phê duyệt đề tài thành công!');
-      fetchProjects();
-    } catch (err: any) {
-      alert('Lỗi phê duyệt: ' + (err.response?.data?.detail || err.message));
-    }
-  };
 
-  const handleOpenRevision = (proj: ProjectTopic) => {
-    setRevisionProject(proj);
-    setRevisionNotes(proj.topic_revision_notes || '');
-  };
-
-  const handleSendRevision = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!revisionProject || !revisionNotes.trim()) return;
-
-    try {
-      await apiClient.patch(`/admin/projects/${revisionProject.id}/topic-approval/`, {
-        decision: 'REQUEST_REVISION',
-        notes: revisionNotes.trim(),
-      });
-      alert('Đã gửi yêu cầu chỉnh sửa đề tài về trạng thái Draft cho GV và SV.');
-      setRevisionProject(null);
-      fetchProjects();
-    } catch (err: any) {
-      alert('Lỗi gửi yêu cầu: ' + (err.response?.data?.detail || err.message));
-    }
-  };
 
   const handleDownloadOutline = async (projId: number, regNo: string) => {
     try {
@@ -136,8 +99,8 @@ export const TopicApprovalPage: React.FC = () => {
         {/* Header Bar */}
         <div className="utc-topics-header-bar">
           <div className="utc-topics-header-info">
-            <h3>Giai Đoạn 3: Phê Duyệt Đề Tài & Sinh Đề Cương ĐATN (Bước 22 & 23)</h3>
-            <p>Hội đồng Khoa/Ban xem xét đề tài do GV & SV gửi lên: Duyệt (Approved) hoặc Yêu cầu sửa về Draft</p>
+            <h3>Giai Đoạn 2: Danh Sách & Giám Sát Đề Tài & Đề Cương ĐATN</h3>
+            <p>Theo chuẩn yeucau.md: Sinh viên đăng ký tên & mục tiêu đề tài ➔ GVHD trực tiếp thẩm định & duyệt đề tài. Sinh viên hoàn thiện đề cương theo mẫu Template và xuất file PDF để GVHD duyệt trên hệ thống.</p>
           </div>
 
           <div className="utc-batch-select-group">
@@ -170,7 +133,7 @@ export const TopicApprovalPage: React.FC = () => {
             className={`utc-topic-stat-box ${statusFilter === 'GV_CONFIRMED' ? 'active' : ''}`}
             onClick={() => setStatusFilter('GV_CONFIRMED')}
           >
-            <span className="stat-title">Chờ Khoa duyệt</span>
+            <span className="stat-title">GVHD đã xác nhận</span>
             <span className="stat-number text-amber">{countPending}</span>
           </div>
 
@@ -178,7 +141,7 @@ export const TopicApprovalPage: React.FC = () => {
             className={`utc-topic-stat-box ${statusFilter === 'APPROVED' ? 'active' : ''}`}
             onClick={() => setStatusFilter('APPROVED')}
           >
-            <span className="stat-title">Khoa đã duyệt (Approved)</span>
+            <span className="stat-title">Đề tài hợp lệ</span>
             <span className="stat-number text-emerald">{countApproved}</span>
           </div>
 
@@ -186,7 +149,7 @@ export const TopicApprovalPage: React.FC = () => {
             className={`utc-topic-stat-box ${statusFilter === 'REVISION_REQUIRED' ? 'active' : ''}`}
             onClick={() => setStatusFilter('REVISION_REQUIRED')}
           >
-            <span className="stat-title">Yêu cầu sửa lại</span>
+            <span className="stat-title">Cần hoàn thiện</span>
             <span className="stat-number text-red">{countRevision}</span>
           </div>
 
@@ -194,7 +157,7 @@ export const TopicApprovalPage: React.FC = () => {
             className={`utc-topic-stat-box ${statusFilter === 'DRAFT' ? 'active' : ''}`}
             onClick={() => setStatusFilter('DRAFT')}
           >
-            <span className="stat-title">Đang soạn nháp (Draft)</span>
+            <span className="stat-title">Đang soạn nháp</span>
             <span className="stat-number text-slate">{countDraft}</span>
           </div>
         </div>
@@ -203,7 +166,7 @@ export const TopicApprovalPage: React.FC = () => {
         <div className="utc-topic-table-card">
           <div className="utc-topic-table-head">
             <h4>Danh sách Đề tài đồ án tốt nghiệp ({filteredProjects.length})</h4>
-            <span className="text-muted">Nhấn "Phê duyệt" để chấp thuận đề tài hoặc "Yêu cầu sửa"</span>
+            <span className="text-muted">Theo dõi danh mục đề tài chính thức do GVHD và SV đăng ký</span>
           </div>
 
           {loading ? (
@@ -220,8 +183,8 @@ export const TopicApprovalPage: React.FC = () => {
                     <th>Hệ ĐT</th>
                     <th>GV Hướng Dẫn</th>
                     <th>Tên Đề Tài Tốt Nghiệp</th>
-                    <th>Trạng Thái Duyệt</th>
-                    <th>Hành Động Của Khoa</th>
+                    <th>Trạng Thái Đề Tài</th>
+                    <th>Tài Liệu / Đề Cương</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -245,50 +208,30 @@ export const TopicApprovalPage: React.FC = () => {
                         {p.topic_title_en && <div className="text-xs text-muted italic">{p.topic_title_en}</div>}
                         {p.topic_revision_notes && (
                           <div className="utc-revision-note-box">
-                            <strong>Lý do sửa:</strong> {p.topic_revision_notes}
+                            <strong>Ghi chú:</strong> {p.topic_revision_notes}
                           </div>
                         )}
                       </td>
                       <td>
                         <span className={`utc-topic-badge badge-${(p.topic_review_status || 'draft').toLowerCase()}`}>
                           {p.topic_review_status === 'APPROVED'
-                            ? '✅ Đã Duyệt'
+                            ? '✅ Đề Tài Hợp Lệ'
                             : p.topic_review_status === 'GV_CONFIRMED'
-                            ? '⏳ Chờ Khoa Duyệt'
+                            ? '✓ GVHD Đã Xác Nhận'
                             : p.topic_review_status === 'REVISION_REQUIRED'
-                            ? '⚠️ Yêu Cầu Sửa'
+                            ? '⚠️ Cần Hoàn Thiện'
                             : '📝 Bản Nháp (Draft)'}
                         </span>
                       </td>
                       <td>
                         <div className="utc-action-btn-group">
-                          {p.topic_review_status !== 'APPROVED' && (
-                            <button
-                              onClick={() => handleApprove(p.id)}
-                              className="utc-btn-sm-approve"
-                              title="Khoa phê duyệt đề tài"
-                            >
-                              ✓ Duyệt
-                            </button>
-                          )}
-
                           <button
-                            onClick={() => handleOpenRevision(p)}
-                            className="utc-btn-sm-reject"
-                            title="Yêu cầu sửa đề tài, trả về Draft"
+                            onClick={() => handleDownloadOutline(p.id, p.student_reg_no)}
+                            className="utc-btn-sm-outline"
+                            title="Tải phiếu giao đề tài Word (.docx)"
                           >
-                            ✎ Yêu cầu sửa
+                            📄 Xuất Phiếu Giao ĐT
                           </button>
-
-                          {p.topic_review_status === 'APPROVED' && (
-                            <button
-                              onClick={() => handleDownloadOutline(p.id, p.student_reg_no)}
-                              className="utc-btn-sm-outline"
-                              title="Tải phiếu giao đề tài Word (.docx)"
-                            >
-                              📄 Tải Đề Cương
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -298,45 +241,6 @@ export const TopicApprovalPage: React.FC = () => {
             </div>
           )}
         </div>
-
-        {/* MODAL: REQUEST REVISION */}
-        {revisionProject && (
-          <div className="utc-modal-backdrop">
-            <div className="utc-modal-card">
-              <div className="utc-modal-head">
-                <h4>⚠️ Yêu Cầu Chỉnh Sửa Đề Tài ĐATN (Bước 22)</h4>
-                <button onClick={() => setRevisionProject(null)} className="utc-btn-close">✕</button>
-              </div>
-              <form onSubmit={handleSendRevision}>
-                <div className="utc-form-group">
-                  <p>Sinh viên: <strong>{revisionProject.student_name}</strong> ({revisionProject.student_reg_no})</p>
-                  <p>Đề tài: <strong>{revisionProject.topic_title_vi}</strong></p>
-                  <p>GVHD: <strong>{revisionProject.supervisor_name}</strong></p>
-                </div>
-
-                <div className="utc-form-group">
-                  <label>Ghi chú lý do yêu cầu chỉnh sửa (sẽ gửi cho GV & SV):</label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="VD: Đề tài quá rộng, cần thu hẹp phạm vi; Tiêu đề cần sát với nội dung công nghệ đã đăng ký..."
-                    value={revisionNotes}
-                    onChange={(e) => setRevisionNotes(e.target.value)}
-                    className="utc-input"
-                  />
-                  <small style={{ color: '#64748b' }}>
-                    Sau khi gửi yêu cầu, đề tài sẽ tự động quay về trạng thái Draft (Bước 20) để GV & SV chỉnh sửa.
-                  </small>
-                </div>
-
-                <div className="utc-modal-foot">
-                  <button type="button" onClick={() => setRevisionProject(null)} className="utc-btn-cancel">Hủy</button>
-                  <button type="submit" className="utc-btn-warning">Gửi Yêu Cầu Sửa</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

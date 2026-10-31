@@ -12,7 +12,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
     navigate('/login');
   };
 
-  const displayName = currentUser?.full_name || currentUser?.username || 'Administrator';
+  const displayName = currentUser?.full_name || currentUser?.username || (userType === 'academic_staff' ? 'Giáo vụ Khoa CNTT' : 'Administrator');
   const displayUsername = currentUser?.username ? `@${currentUser.username}` : '';
 
   return (
@@ -43,25 +43,22 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
             <span>📅</span> GĐ1: Đợt & Bộ Môn
           </NavLink>
           <NavLink to="/allocations" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>🤝</span> GĐ2: Phân Công GVHD
+            <span>🤝</span> GĐ1: Phân Công GVHD
           </NavLink>
           <NavLink to="/topics" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>📑</span> GĐ3: Duyệt Đề Tài
-          </NavLink>
-          <NavLink to="/eligibility" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>⚖️</span> GĐ4: Xét ĐK & Force Approve
+            <span>📑</span> GĐ2: Đề Tài & Đề Cương
           </NavLink>
           <NavLink to="/progress" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>📈</span> GĐ5: Giám Sát Tiến Độ
+            <span>📈</span> GĐ3: Giám Sát Tiến Độ & Điểm
           </NavLink>
-          <NavLink to="/outlines" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>📋</span> Duyệt Đề Cương
+          <NavLink to="/eligibility" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            <span>⚖️</span> GĐ4: Hậu Kiểm Học Vụ (Nợ 0 TC)
           </NavLink>
           <NavLink to="/councils" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>🏛️</span> GĐ6: Hội Đồng & Lịch BV
+            <span>🏛️</span> GĐ5: Hội Đồng & Lịch BV
           </NavLink>
           <NavLink to="/defense" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-            <span>📝</span> Điểm, Bảo Lưu & Chốt
+            <span>📝</span> GĐ6: Điểm BV, Biên Bản & Bế Mạc
           </NavLink>
           <NavLink to="/security" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             <span>🛡️</span> Trung Tâm Bảo Mật
@@ -77,7 +74,7 @@ export const AdminLayout: React.FC<{ children: React.ReactNode }> = ({ children 
           <div className="admin-header-title">Hệ Thống Quản Trị Dữ Liệu Đồ Án Tốt Nghiệp UTC</div>
           <div className="admin-header-user">
             <span className="admin-user-badge" title={currentUser?.email ? `Email: ${currentUser.email}` : undefined}>
-              {userType === 'academic_staff' ? '💼 Giáo vụ Khoa CNTT' : `🛡️ ${displayName}`} {displayUsername && <span style={{ opacity: 0.85, fontSize: '0.9em', marginLeft: 4 }}>({displayUsername})</span>}
+              {userType === 'academic_staff' ? '💼 ' : '🛡️ '}{displayName} {displayUsername && <span style={{ opacity: 0.85, fontSize: '0.9em', marginLeft: 4 }}>({displayUsername})</span>}
             </span>
             <button className="admin-logout-btn" onClick={handleLogout}>Đăng Xuất</button>
           </div>

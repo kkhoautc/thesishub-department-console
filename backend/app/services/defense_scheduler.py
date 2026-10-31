@@ -44,13 +44,7 @@ class DefenseSchedulerEngine:
                 projects = list(GraduationProject.objects.filter(
                     council=council,
                     is_eligible_for_defense=True
-                ).exclude(deferral_status="APPROVED").order_by("student__registration_no"))
-
-                # Nếu chưa có dự án được lọc theo is_eligible_for_defense, lấy tất cả dự án trong council
-                if not projects:
-                    projects = list(GraduationProject.objects.filter(
-                        council=council
-                    ).exclude(deferral_status="APPROVED").order_by("student__registration_no"))
+                ).exclude(deferral_status="APPROVED").exclude(status__in=["DEFERRED", "DISQUALIFIED", "FAILED"]).order_by("student__registration_no"))
 
                 if not projects:
                     continue

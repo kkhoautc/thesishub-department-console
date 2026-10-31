@@ -42,11 +42,13 @@ from .views import (
     AutoDefenseScheduleAPIView,
     ManualReviewerOverrideAPIView,
     FinalizeCouncilScoresAPIView,
+    CouncilMinutesPdfExportAPIView,
     CloseBatchAPIView,
     ExportFinalSummaryExcelAPIView,
     SupervisorListAPIView,
     AcademicStaffFinalGradesAPIView,
     AcademicStaffExportClassGradesExcelAPIView,
+    AcademicStaffExportEligibilityReportExcelAPIView,
     AcademicStaffCompleteBatchAPIView,
     AdminSeedDataAPIView,
 )
@@ -123,6 +125,7 @@ urlpatterns = [
 
     # Xét điều kiện làm đồ án & Force Approve (Giai đoạn 4)
     path("admin/eligibility/import-excel/", ExcelEligibilityImportAPIView.as_view(), name="admin-eligibility-import-excel"),
+    path("admin/eligibility/export-excel/", AcademicStaffExportEligibilityReportExcelAPIView.as_view(), name="admin-eligibility-export-excel"),
     path("admin/projects/<int:pk>/eligibility-decision/", EligibilityDecisionAPIView.as_view(), name="admin-projects-eligibility-decision"),
     path("admin/projects/<int:pk>/force-approve/", EligibilityDecisionAPIView.as_view(), name="admin-projects-force-approve"),
     path("projects/<int:pk>/eligibility-decision/", EligibilityDecisionAPIView.as_view(), name="projects-eligibility-decision"),
@@ -136,12 +139,14 @@ urlpatterns = [
     path("admin/final-academic/import-excel/", ExcelFinalAcademicImportAPIView.as_view(), name="admin-final-academic-import-excel"),
     path("admin/projects/<int:pk>/deferral-decision/", DeferralDecisionAPIView.as_view(), name="admin-projects-deferral-decision"),
     path("admin/councils/", DefenseCouncilListCreateAPIView.as_view(), name="admin-councils"),
+    path("admin/councils/<int:pk>/", DefenseCouncilListCreateAPIView.as_view(), name="admin-councils-detail"),
     path("admin/councils/<int:pk>/finalize-scores/", FinalizeCouncilScoresAPIView.as_view(), name="admin-councils-finalize-scores"),
     path("admin/reviewers/auto-assign/", AutoReviewerAllocationAPIView.as_view(), name="admin-reviewers-auto-assign"),
     path("admin/defense/override-reviewer/", ManualReviewerOverrideAPIView.as_view(), name="admin-defense-override-reviewer"),
     path("admin/defense/auto-schedule/", AutoDefenseScheduleAPIView.as_view(), name="admin-defense-auto-schedule"),
 
-    # Document Generation (Word, Excel) & Xuất cuối kỳ
+    # Document Generation (Word, Excel, PDF) & Xuất cuối kỳ
+    path("admin/councils/<int:council_id>/export-minutes-pdf/", CouncilMinutesPdfExportAPIView.as_view(), name="admin-councils-export-minutes-pdf"),
     path("admin/export/to-trinh-word/", ExportToTrinhWordAPIView.as_view(), name="admin-export-to-trinh-word"),
     path("admin/export/bien-ban-excel/", ExportBienBanExcelAPIView.as_view(), name="admin-export-bien-ban-excel"),
     path("admin/export/final-summary-excel/", ExportFinalSummaryExcelAPIView.as_view(), name="admin-export-final-summary-excel"),

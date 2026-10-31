@@ -1022,9 +1022,17 @@ class ExcelStudentImportAPIView(APIView):
                     batch_name=f"Đợt Đồ Án {timezone.now().year}",
                     is_active=True
                 )
-            batch_id = active_batch.id
+        password_strategy = request.data.get("password_strategy", "MSSV")
+        custom_fixed_password = request.data.get("custom_fixed_password", "")
+        default_major = request.data.get("default_major", "CNTT")
 
-        res = ExcelImportService.import_students_from_excel(file_obj, batch_id)
+        res = ExcelImportService.import_students_from_excel(
+            file_obj=file_obj,
+            batch_id=batch_id,
+            password_strategy=password_strategy,
+            custom_fixed_password=custom_fixed_password,
+            default_major=default_major
+        )
 
         AuditLog.objects.create(
             user=request.user,
@@ -1250,6 +1258,29 @@ class DefenseCouncilListCreateAPIView(APIView):
                     )
 
         return Response(DefenseCouncilSerializer(council).data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, pk=None):
+        council_id = pk or request.query_params.get("id") or request.data.get("id")
+        if not council_id:
+            return Response({"detail": "Council ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+        council = get_object_or_404(DefenseCouncil, id=council_id)
+        if council.is_finalized:
+            return Response({"detail": "Không thể xóa Hội đồng đã khóa / chốt điểm."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Reset projects and schedule slots associated with this council
+        GraduationProject.objects.filter(council=council).update(council=None, reviewer=None)
+        DefenseScheduleSlot.objects.filter(council=council).delete()
+        council_name = council.council_name
+        council.delete()
+
+        AuditLog.objects.create(
+            user=request.user,
+            action_type="group_status_change",
+            description=f"Admin đã xóa {council_name}."
+        )
+
+        return Response({"message": f"Đã xóa thành công {council_name}."}, status=status.HTTP_200_OK)
+
 
 
 class AutoReviewerAllocationAPIView(APIView):
@@ -1820,7 +1851,13 @@ class EligibilityDecisionAPIView(APIView):
 
         if decision in ("FORCE_APPROVE", "FORCE_APPROVED", "APPROVE", "APPROVED"):
             project.initial_eligibility = "FORCE_APPROVED"
-            project.status = "IN_PROGRESS"
+            project.final_academic_eligibility = "ELIGIBLE"
+            project.is_eligible_for_defense = True
+            if project.supervisor_defense_confirmed or (project.supervisor_score is not None and str(project.supervisor_score) != ""):
+                project.status = "DEFENSE_READY"
+            else:
+                project.status = "IN_PROGRESS"
+            project.deferral_status = "NONE"
             project.force_approved_by = request.user
             project.force_approved_at = timezone.now()
             project.ineligibility_reason = f"Đặc cách: {reason}" if reason else (project.ineligibility_reason or "Khoa phê duyệt đặc cách theo đơn giải trình")
@@ -1831,11 +1868,29 @@ class EligibilityDecisionAPIView(APIView):
                 action_type="evaluation_update",
                 description=f"Khoa Force Approve cho SV {project.student.registration_no}: {reason}"
             )
-            return Response({"message": "Khoa đã đặc cách cho phép làm đồ án (Force Approve).", "status": "FORCE_APPROVED"}, status=status.HTTP_200_OK)
+            return Response({"message": "Khoa đã đặc cách cho phép bảo vệ đồ án (Force Approve).", "status": "DEFENSE_READY"}, status=status.HTTP_200_OK)
+
+        elif decision in ("DEFER", "DEFERRED"):
+            project.initial_eligibility = "INELIGIBLE"
+            project.final_academic_eligibility = "INELIGIBLE"
+            project.status = "DEFERRED"
+            project.deferral_status = "APPROVED"
+            project.is_eligible_for_defense = False
+            project.deferral_reason = reason or "Khoa xác nhận bảo lưu đồ án do nợ tín chỉ"
+            project.deferral_decided_at = timezone.now()
+            project.save()
+
+            AuditLog.objects.create(
+                user=request.user,
+                action_type="evaluation_update",
+                description=f"Khoa chuyển bảo lưu đồ án cho SV {project.student.registration_no}: {reason}"
+            )
+            return Response({"message": "Đã chuyển sinh viên sang trạng thái bảo lưu đồ án.", "status": "DEFERRED"}, status=status.HTTP_200_OK)
 
         elif decision in ("DISQUALIFY", "DISQUALIFIED", "REJECT", "REJECTED"):
             project.initial_eligibility = "DISQUALIFIED"
             project.status = "DISQUALIFIED"
+            project.is_eligible_for_defense = False
             project.ineligibility_reason = reason or "Không đủ điều kiện làm đồ án tốt nghiệp"
             project.save()
 
@@ -1846,7 +1901,8 @@ class EligibilityDecisionAPIView(APIView):
             )
             return Response({"message": "Đã loại sinh viên khỏi đợt đồ án.", "status": "DISQUALIFIED"}, status=status.HTTP_200_OK)
 
-        return Response({"detail": "Quyết định không hợp lệ (FORCE_APPROVE hoặc DISQUALIFY)."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Quyết định không hợp lệ (FORCE_APPROVE, DEFER, hoặc DISQUALIFY)."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class SupervisorListAPIView(ListAPIView):
@@ -1995,6 +2051,103 @@ class FinalizeCouncilScoresAPIView(APIView):
         )
 
         return Response({"message": f"Đã chốt điểm thành công cho {council.council_name}."}, status=status.HTTP_200_OK)
+
+
+class CouncilMinutesPdfExportAPIView(APIView):
+    """
+    Giai đoạn 6: Xuất Biên bản họp Hội đồng bảo vệ ĐATN ra định dạng PDF chuẩn UTC.
+    Gồm đầy đủ: Thành phần Hội đồng (1CT-2TK-2UV), Điểm từng thành viên, Điểm TB HĐ, Điểm tổng kết và chữ ký.
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
+
+    def get(self, request, council_id):
+        council = get_object_or_404(
+            DefenseCouncil.objects.select_related("batch"),
+            id=council_id
+        )
+
+        import io
+        import os
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+
+        font_name = "Helvetica"
+        if os.path.exists("C:\\Windows\\Fonts\\arial.ttf"):
+            try:
+                pdfmetrics.registerFont(TTFont("Arial", "C:\\Windows\\Fonts\\arial.ttf"))
+                font_name = "Arial"
+            except Exception:
+                pass
+
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+
+        # Header
+        p.setFont(font_name, 10)
+        p.drawString(45, height - 45, "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI")
+        p.drawString(45, height - 60, "KHOA CÔNG NGHỆ THÔNG TIN")
+        p.drawString(width - 230, height - 45, "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM")
+        p.drawString(width - 190, height - 60, "Độc lập - Tự do - Hạnh phúc")
+
+        p.setFont(font_name, 14)
+        p.drawCentredString(width / 2, height - 100, f"BIÊN BẢN HỌP HỘI ĐỒNG BẢO VỆ ĐỒ ÁN TỐT NGHIỆP #{council.council_number}")
+
+        p.setFont(font_name, 9)
+        y = height - 128
+        session_time_disp = council.get_session_time_display()
+        p.drawString(45, y, f"Hội đồng: {council.council_name} | Phòng: {council.defense_room or 'TBA'} | Ngày: {council.session_date or 'TBA'} ({session_time_disp})")
+        y -= 22
+
+        p.setFont(font_name, 10)
+        p.drawString(45, y, "I. THÀNH PHẦN HỘI ĐỒNG (Cơ cấu chuẩn UTC: 1 Chủ tịch - 2 Thư ký - 2 Ủy viên):")
+        y -= 16
+        p.setFont(font_name, 9)
+        members = list(council.members.select_related("user", "supervisor").all())
+        for idx, m in enumerate(members, 1):
+            deg = m.supervisor.academic_title if m.supervisor else ""
+            p.drawString(65, y, f"{idx}. {m.get_role_display()}: {deg} {m.user.get_full_name()} ({m.user.email})")
+            y -= 15
+
+        y -= 12
+        p.setFont(font_name, 10)
+        p.drawString(45, y, "II. KẾT QUẢ ĐÁNH GIÁ VÀ ĐIỂM BẢO VỆ:")
+        y -= 18
+        p.setFont(font_name, 8)
+        p.drawString(45, y, "STT | MSSV | Họ và tên SV | Điểm GVHD | Điểm GVPB | Điểm TB HĐ | Điểm TK (Hệ 10 / Chữ / Xếp loại)")
+        y -= 14
+
+        projects = council.projects.select_related("student__user", "final_grade_summary").all()
+        for idx, proj in enumerate(projects, 1):
+            summary = getattr(proj, "final_grade_summary", None)
+            sup_s = f"{proj.supervisor_score:.1f}" if proj.supervisor_score is not None else "--"
+            rev_s = f"{proj.reviewer_score:.1f}" if proj.reviewer_score is not None else "--"
+            cou_s = f"{summary.council_avg_score:.2f}" if summary and summary.council_avg_score is not None else "--"
+            fin_s = f"{summary.final_score_10:.2f} ({summary.final_letter_grade} - {summary.classification})" if summary and summary.final_score_10 is not None else "--"
+            s_name = proj.student.user.get_full_name() if proj.student and proj.student.user else ""
+            p.drawString(45, y, f"{idx}. {proj.student.registration_no} - {s_name} | {sup_s}đ | {rev_s}đ | {cou_s}đ | {fin_s}")
+            y -= 15
+            if y < 90:
+                p.showPage()
+                y = height - 50
+
+        y -= 30
+        p.setFont(font_name, 9)
+        p.drawString(65, y, "CHỦ TỊCH HỘI ĐỒNG")
+        p.drawString(width - 200, y, "THƯ KÝ HỘI ĐỒNG")
+        p.drawString(65, y - 14, "(Ký và ghi rõ họ tên)")
+        p.drawString(width - 200, y - 14, "(Ký và ghi rõ họ tên)")
+
+        p.showPage()
+        p.save()
+
+        buffer.seek(0)
+        filename = f"Bien_ban_HD_{council.council_number}.pdf"
+        response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 class CloseBatchAPIView(APIView):
@@ -2222,6 +2375,35 @@ class AcademicStaffExportClassGradesExcelAPIView(APIView):
             return response
         except Exception as ex:
             return Response({"detail": f"Lỗi tạo file bảng điểm: {str(ex)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AcademicStaffExportEligibilityReportExcelAPIView(APIView):
+    """
+    Giai đoạn 4: Xuất báo cáo danh sách sinh viên đủ điều kiện và không đủ điều kiện (bảo lưu) ra file Excel.
+    """
+    permission_classes = [IsAuthenticated, IsAdminUserRole]
+
+    def get(self, request):
+        batch_id = request.query_params.get("batch_id")
+        if not batch_id:
+            batch = AcademicBatch.objects.filter(is_active=True).first() or AcademicBatch.objects.first()
+            if not batch:
+                return Response({"detail": "batch_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+            batch_id = batch.id
+
+        try:
+            buffer = DocumentGenerationService.generate_eligibility_report_excel(batch_id)
+            batch = AcademicBatch.objects.get(id=batch_id)
+            filename = f"Bao_Cao_Hau_Kiem_Hoc_Vu_Dot_{batch.batch_code}.xlsx"
+
+            response = HttpResponse(
+                buffer.getvalue(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as ex:
+            return Response({"detail": f"Lỗi tạo báo cáo hậu kiểm học vụ: {str(ex)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AcademicStaffCompleteBatchAPIView(APIView):

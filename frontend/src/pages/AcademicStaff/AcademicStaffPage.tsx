@@ -252,6 +252,25 @@ export const AcademicStaffPage: React.FC = () => {
     }
   };
 
+  // Handle Export Eligibility Report
+  const handleExportEligibilityReport = async () => {
+    if (!selectedBatchId) return;
+    try {
+      const res = await apiClient.get(`/admin/eligibility/export-excel/?batch_id=${selectedBatchId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Bao_Cao_Hau_Kiem_Hoc_Vu_Dot_${selectedBatchId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      alert('Lỗi xuất báo cáo hậu kiểm: ' + (err.message || 'Lỗi server'));
+    }
+  };
+
   // Filtered Eligibility
   const filteredEligibility = eligibilityProjects.filter((p) => {
     if (filterEligibility !== 'ALL' && p.initial_eligibility !== filterEligibility) {
@@ -322,13 +341,13 @@ export const AcademicStaffPage: React.FC = () => {
             className={`utc-academic-tab-btn ${activeTab === 'ELIGIBILITY' ? 'active' : ''}`}
             onClick={() => setActiveTab('ELIGIBILITY')}
           >
-            <span>📋</span> 1. Xét Điều Kiện Làm ĐATN (Căn Cứ Tín Chỉ Nợ)
+            <span>🛡️</span> 1. GĐ 4: Hậu Kiểm Điều Kiện Học Vụ (Nợ 0 TC)
           </button>
           <button
             className={`utc-academic-tab-btn ${activeTab === 'FINAL_GRADES' ? 'active' : ''}`}
             onClick={() => setActiveTab('FINAL_GRADES')}
           >
-            <span>🎓</span> 2. Tổng Kết Điểm & Xuất In Theo Lớp (Cuối Kỳ)
+            <span>🎓</span> 2. GĐ 6: Tổng Kết Điểm &amp; Xuất In Theo Lớp (Cuối Kỳ)
           </button>
         </div>
 
@@ -337,10 +356,10 @@ export const AcademicStaffPage: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Rule Banner */}
             <div className="utc-rule-banner">
-              <strong>📌 Quy Chế Xét Duyệt Điều Kiện Làm Đồ Án Tốt Nghiệp (Khoa CNTT - UTC):</strong>
+              <strong>📌 Quy Chế Giai Đoạn 4: Hậu Kiểm Điều Kiện Học Vụ Trước Khi Bảo Vệ (Khoa CNTT - UTC):</strong>
               <div style={{ marginTop: '0.35rem' }}>
-                • <strong>Sinh viên nợ &lt; 10 tín chỉ</strong>: Đạt chuẩn điều kiện học vụ → Hệ thống tự động xác nhận <strong>ĐỦ ĐIỀU KIỆN</strong> và chuyển sang bước giao việc / làm đồ án (Trạng thái <code>IN_PROGRESS</code>).<br />
-                • <strong>Sinh viên nợ &ge; 10 tín chỉ</strong>: <strong>KHÔNG ĐỦ ĐIỀU KIỆN</strong> → Chuyển vào danh sách chờ Ban Chủ nhiệm Khoa xét duyệt <strong>Force Approve (Đặc cách)</strong> hoặc <strong>Loại khỏi đợt</strong>.
+                • <strong>Sinh viên nợ tích lũy = 0 tín chỉ</strong>: Đủ điều kiện học vụ → Hệ thống xác nhận <strong>ĐỦ ĐIỀU KIỆN BẢO VỆ</strong> và chuyển sang Giai đoạn 5 (Hội đồng &amp; Xếp lịch bảo vệ).<br />
+                • <strong>Sinh viên nợ tích lũy &gt; 0 tín chỉ</strong>: <strong>BẢO LƯU ĐỒ ÁN</strong> → Tự động chuyển trạng thái Bảo lưu đồ án (chờ đợt sau) hoặc chờ BCN Khoa xét duyệt đặc cách theo đơn.
               </div>
             </div>
 
@@ -359,18 +378,18 @@ export const AcademicStaffPage: React.FC = () => {
                 className={`utc-metric-box ${filterEligibility === 'ELIGIBLE' ? 'active' : ''}`}
                 onClick={() => setFilterEligibility('ELIGIBLE')}
               >
-                <span className="metric-label">Đủ Điều Kiện (&lt; 10 TC)</span>
+                <span className="metric-label">Nợ = 0 TC (Đủ ĐK Bảo Vệ)</span>
                 <span className="metric-value" style={{ color: '#16a34a' }}>{countEligible}</span>
-                <span className="metric-sub">Đã chuyển sang giao task đồ án</span>
+                <span className="metric-sub">Đủ điều kiện ra Hội đồng bảo vệ (GĐ 5)</span>
               </div>
 
               <div
                 className={`utc-metric-box ${filterEligibility === 'INELIGIBLE' ? 'active' : ''}`}
                 onClick={() => setFilterEligibility('INELIGIBLE')}
               >
-                <span className="metric-label">Không Đủ ĐK (&ge; 10 TC)</span>
+                <span className="metric-label">Nợ &gt; 0 TC (Bảo Lưu Đồ Án)</span>
                 <span className="metric-value" style={{ color: '#dc2626' }}>{countIneligible}</span>
-                <span className="metric-sub">Chờ BCN Khoa xét đặc cách</span>
+                <span className="metric-sub">Tự động chuyển bảo lưu đồ án</span>
               </div>
 
               <div
@@ -379,7 +398,7 @@ export const AcademicStaffPage: React.FC = () => {
               >
                 <span className="metric-label">Đã Đặc Cách (Force Approve)</span>
                 <span className="metric-value" style={{ color: '#2563eb' }}>{countForceApproved}</span>
-                <span className="metric-sub">Khoa đã cho phép làm đồ án</span>
+                <span className="metric-sub">Khoa đã cho phép bảo vệ theo đơn</span>
               </div>
 
               <div
@@ -388,7 +407,7 @@ export const AcademicStaffPage: React.FC = () => {
               >
                 <span className="metric-label">Bị Loại Khỏi Đợt</span>
                 <span className="metric-value" style={{ color: '#64748b' }}>{countDisqualified}</span>
-                <span className="metric-sub">Không được phép làm ĐATN</span>
+                <span className="metric-sub">Không đủ ĐK / Hủy kết quả</span>
               </div>
             </div>
 
@@ -396,9 +415,9 @@ export const AcademicStaffPage: React.FC = () => {
             <div className="utc-card-container">
               <div className="utc-card-header">
                 <div>
-                  <h4>Danh Sách Xét Duyệt Điều Kiện Làm Đồ Án ({filteredEligibility.length})</h4>
+                  <h4>Giai Đoạn 4: Danh Sách Hậu Kiểm Điều Kiện Bảo Vệ ({filteredEligibility.length})</h4>
                   <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-                    Dữ liệu căn cứ trực tiếp trên cột số tín chỉ nợ trong bảng Đồ án Tốt nghiệp
+                    Tiêu chuẩn: Nợ tích lũy 0 TC được ra Hội đồng bảo vệ; Nợ &gt; 0 TC tự động bảo lưu đồ án.
                   </span>
                 </div>
 
@@ -414,7 +433,13 @@ export const AcademicStaffPage: React.FC = () => {
                     onClick={() => setShowImportModal(true)}
                     className="btn-primary-utc"
                   >
-                    <span>📊</span> Import File Điểm / Tín Chỉ Nợ (Excel)
+                    <span>📊</span> Import Điểm &amp; Nợ TC (Excel)
+                  </button>
+                  <button
+                    onClick={handleExportEligibilityReport}
+                    style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '0.5rem 0.85rem', borderRadius: '7px', fontWeight: 600, fontSize: '0.82rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  >
+                    <span>📥</span> Xuất Báo Cáo Hậu Kiểm (Excel)
                   </button>
                 </div>
               </div>
@@ -437,8 +462,8 @@ export const AcademicStaffPage: React.FC = () => {
                         <th>Sinh Viên</th>
                         <th>Lớp / Bộ Môn</th>
                         <th>Hệ ĐT</th>
-                        <th style={{ textAlign: 'center' }}>Tín Chỉ Nợ</th>
-                        <th>Trạng Thái Xét Duyệt</th>
+                        <th style={{ textAlign: 'center' }}>Tín Chỉ Nợ (= 0 TC)</th>
+                        <th>Kết Quả Hậu Kiểm GĐ 4</th>
                         <th>Trạng Thái ĐATN</th>
                         <th>Ghi Chú / Lý Do</th>
                         <th style={{ textAlign: 'center' }}>Thao Tác Giáo Vụ / Khoa</th>
@@ -446,7 +471,7 @@ export const AcademicStaffPage: React.FC = () => {
                     </thead>
                     <tbody>
                       {filteredEligibility.map((p, idx) => {
-                        const isOk = p.debt_credits < 10;
+                        const isOk = (p.debt_credits || 0) === 0;
                         return (
                           <tr key={p.id}>
                             <td style={{ color: '#64748b', textAlign: 'center' }}>{idx + 1}</td>
@@ -463,24 +488,24 @@ export const AcademicStaffPage: React.FC = () => {
                             </td>
                             <td style={{ textAlign: 'center' }}>
                               <span className={isOk ? 'debt-highlight-ok' : 'debt-highlight-fail'}>
-                                {p.debt_credits} TC
+                                {p.debt_credits || 0} TC
                               </span>
                             </td>
                             <td>
                               {p.initial_eligibility === 'ELIGIBLE' && (
-                                <span className="badge-green">✅ Đủ Điều Kiện</span>
+                                <span className="badge-green">✅ Đủ ĐK Bảo Vệ (0 TC)</span>
                               )}
                               {p.initial_eligibility === 'INELIGIBLE' && (
-                                <span className="badge-red">⚠️ Không Đủ ĐK (&ge;10 TC)</span>
+                                <span className="badge-red">⚠️ Bảo Lưu Đồ Án (Nợ &gt; 0 TC)</span>
                               )}
                               {p.initial_eligibility === 'FORCE_APPROVED' && (
-                                <span className="badge-blue">⭐ Khoa Đặc Cách</span>
+                                <span className="badge-blue">⭐ Khoa Đặc Cách Bảo Vệ</span>
                               )}
                               {p.initial_eligibility === 'DISQUALIFIED' && (
                                 <span className="badge-amber">🚫 Bị Loại Khỏi Đợt</span>
                               )}
                               {p.initial_eligibility === 'PENDING' && (
-                                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>⏳ Chưa xét</span>
+                                <span style={{ color: '#64748b', fontSize: '0.78rem' }}>⏳ Chưa hậu kiểm</span>
                               )}
                             </td>
                             <td>

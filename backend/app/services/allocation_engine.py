@@ -313,20 +313,50 @@ class MinCostMaxFlowAllocationEngine:
 
     @classmethod
     def publish_and_notify_allocation(cls, batch_id, user=None):
-        """Công bố và gửi email kết quả phân công (Bước 18 & 19)"""
+        """Công bố và gửi email kết quả phân công (GĐ 1 yeucau.md)"""
         batch = AcademicBatch.objects.get(id=batch_id)
         batch.is_allocation_published = True
         batch.allocation_published_at = timezone.now()
         batch.current_stage = "PHASE_3_TOPIC"
         batch.save(update_fields=["is_allocation_published", "allocation_published_at", "current_stage"])
 
+        # 1. Gửi email thông báo tự động theo quy định GĐ 1
+        from .email_service import EmailNotificationService
+        email_res = EmailNotificationService.send_assignment_finalized_emails(batch_id)
+        emails_sent = email_res.get("emails_sent", 0)
+
+        # 2. Tạo bản ghi Notification thông báo trong hệ thống cho toàn bộ SV và GVHD
+        from app.models import Notification, GraduationProject
+        projects = GraduationProject.objects.filter(batch=batch).select_related("student__user", "supervisor__user")
+        notif_count = 0
+        for p in projects:
+            if p.student and p.student.user:
+                Notification.objects.create(
+                    user=p.student.user,
+                    title="Thông báo Phân công Giảng viên hướng dẫn",
+                    message=f"Bạn đã được phân công Giảng viên hướng dẫn: {p.supervisor}. Vui lòng đăng ký tên và mục tiêu đề tài (Giai đoạn 2).",
+                    notification_type="allocation"
+                )
+                notif_count += 1
+            if p.supervisor and p.supervisor.user:
+                Notification.objects.create(
+                    user=p.supervisor.user,
+                    title="Thông báo Danh sách Sinh viên hướng dẫn",
+                    message=f"Sinh viên {p.student.user.get_full_name()} (MSSV: {p.student.registration_no}) đã được phân công vào danh sách hướng dẫn của bạn.",
+                    notification_type="allocation"
+                )
+                notif_count += 1
+
         if user:
             AuditLog.objects.create(
                 user=user,
                 action_type="group_status_change",
-                description=f"Khoa đã công bố và phát lệnh thông báo kết quả phân công cho Đợt {batch.batch_code}."
+                description=f"Khoa đã công bố và phát lệnh thông báo kết quả phân công cho Đợt {batch.batch_code}. Đã gửi {emails_sent} emails và {notif_count} thông báo."
             )
         return {
             "success": True,
-            "message": "Đã công bố và gửi thông báo kết quả phân công cho toàn bộ Giảng viên và Sinh viên."
+            "emails_sent": emails_sent,
+            "notifications_created": notif_count,
+            "message": f"Đã công bố và gửi email thông báo kết quả phân công thành công ({emails_sent} email đã phát lệnh, {notif_count} thông báo hệ thống)."
         }
+

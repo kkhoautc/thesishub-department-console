@@ -664,4 +664,355 @@
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
+/* Modal System for Batches Page */
+.utc-modal-card {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+  animation: utcModalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.utc-modal-card.wide {
+  max-width: 760px;
+}
+
+.utc-modal-card.medium {
+  max-width: 540px;
+}
+
+@keyframes utcModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.utc-modal-head {
+  padding: 1.25rem 1.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.utc-modal-head h4 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.utc-modal-body {
+  padding: 1.5rem 1.75rem;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+}
+
+.utc-modal-foot {
+  padding: 1rem 1.75rem;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.utc-btn-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.utc-btn-close:hover {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+/* Universal Inputs */
+.utc-input {
+  padding: 0.65rem 0.85rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.utc-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+
+.utc-input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* Form Helper & Labels */
+.utc-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.84rem;
+  color: #1e293b;
+  margin-bottom: 0.35rem;
+}
+
+.utc-label-required {
+  color: #dc2626;
+  margin-left: 2px;
+}
+
+.utc-help-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 0.3rem;
+  line-height: 1.35;
+}
+
+/* Drag and Drop Zone */
+.utc-dropzone {
+  border: 2px dashed #94a3b8;
+  border-radius: 12px;
+  padding: 1.75rem 1.25rem;
+  text-align: center;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.utc-dropzone:hover,
+.utc-dropzone.active {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.utc-dropzone-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.utc-dropzone-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+.utc-dropzone-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.utc-file-preview-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border: 1.5px solid #0284c7;
+  border-radius: 10px;
+  margin-top: 0.75rem;
+}
+
+.utc-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.utc-file-icon {
+  font-size: 1.75rem;
+}
+
+.utc-file-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.utc-file-size {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+/* Row Action Buttons in Table */
+.utc-action-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.utc-action-btn {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.utc-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.utc-action-btn.edit:hover {
+  background: #e0f2fe;
+  color: #0369a1;
+  border-color: #7dd3fc;
+}
+
+.utc-action-btn.key:hover {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.utc-action-btn.delete:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fca5a5;
+}
+
+/* Filter Buttons */
+.utc-filter-pill {
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.utc-filter-pill:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.utc-filter-pill.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+/* Error Table for Excel Import */
+.utc-error-table-container {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  margin-top: 0.75rem;
+  background: #fff;
+}
+
+.utc-error-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.utc-error-table th {
+  background: #fef2f2;
+  color: #991b1b;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid #fecaca;
+  font-weight: 700;
+}
+
+.utc-error-table td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid #fee2e2;
+  color: #7f1d1d;
+}
+
+/* Batch Card Actions */
+.utc-batch-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.utc-batch-action-icon {
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.15s;
+}
+
+.utc-batch-action-icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.utc-batch-action-icon.danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+
+/* Quick Suggestion Tag */
+.utc-quick-tag {
+  display: inline-block;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #0369a1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 0.25rem;
+  margin-right: 0.4rem;
+}
+
+.utc-quick-tag:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+
 

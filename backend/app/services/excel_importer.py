@@ -5,6 +5,7 @@ import re
 import random
 import string
 from django.db import transaction
+from django.utils import timezone
 from app.models import (
     CustomUser,
     Student,
@@ -709,20 +710,24 @@ class ExcelImportService:
                 if col_reason and ws.cell(r, col_reason).value:
                     reason_str = str(ws.cell(r, col_reason).value).strip()
 
-                # Xét điều kiện theo quy chế UTC: Nợ < 10 tín chỉ: Đủ điều kiện; Nợ >= 10 tín chỉ: Không đủ điều kiện (chờ Khoa xét)
+                # Xét điều kiện ban đầu làm ĐATN (Stage 1 / Step 27):
+                # Nợ < 10 TC và GPA >= 2.0: Đủ điều kiện làm đồ án (chuyển sang IN_PROGRESS)
+                # Nợ >= 10 TC: Chưa đủ điều kiện, chờ Khoa Force Approve hoặc loại khỏi đợt
                 is_eligible = (debt_cred < 10)
+                if gpa is not None and gpa < 2.0:
+                    is_eligible = False
                 if "không" in verdict_str or "trượt" in verdict_str or "loại" in verdict_str:
                     is_eligible = False
 
                 if is_eligible:
                     status_val = "ELIGIBLE"
                     if not reason_str:
-                        reason_str = f"Nợ {debt_cred} tín chỉ (< 10 TC) - Đủ điều kiện chuyển sang bước giao task đồ án"
+                        reason_str = "Đủ điều kiện làm ĐATN"
                     eligible_count += 1
                 else:
                     status_val = "INELIGIBLE"
                     if not reason_str:
-                        reason_str = f"Nợ {debt_cred} tín chỉ (>= 10 TC theo quy định), chờ Ban Chủ nhiệm Khoa xét Force Approve hoặc Loại khỏi đợt"
+                        reason_str = f"Nợ {debt_cred} tín chỉ (>= 10 TC)"
                     ineligible_count += 1
 
                 proj = getattr(student, "graduation_project", None)
@@ -732,14 +737,15 @@ class ExcelImportService:
                     proj.initial_eligibility = status_val
                     proj.ineligibility_reason = reason_str
 
-                    # Nếu nợ < 10 tín chỉ: Cho phép chuyển sang bước giao task đồ án (IN_PROGRESS)
                     if is_eligible:
                         proj.status = "IN_PROGRESS"
                     else:
-                        if proj.status == "IN_PROGRESS":
-                            proj.status = "OUTLINE_APPROVED"
+                        proj.status = "OUTLINE_APPROVED"
 
-                    proj.save(update_fields=["gpa_score", "debt_credits", "initial_eligibility", "ineligibility_reason", "status"])
+                    proj.save(update_fields=[
+                        "gpa_score", "debt_credits", "initial_eligibility",
+                        "ineligibility_reason", "status"
+                    ])
 
                     updated_projects.append({
                         "student_name": student.user.get_full_name(),
@@ -797,30 +803,62 @@ class ExcelImportService:
                 if not proj:
                     continue
 
-                # Cột 3: Trạng thái (Đạt / Không đạt / Đủ / Không đủ)
-                status_raw = str(ws.cell(r, 3).value or "Đủ").strip().lower()
+                # Cột 3: Số tín chỉ nợ hoặc trạng thái (GD 4 yeucau.md)
+                raw_c3 = ws.cell(r, 3).value
+                status_raw = str(raw_c3 or "").strip().lower()
                 note = str(ws.cell(r, 4).value or "").strip()
 
-                is_ok = ("không" not in status_raw and "chưa" not in status_raw)
+                # Kiểm tra nợ tín chỉ: nếu là số hoặc chuỗi chứa số tín chỉ nợ
+                debt_cred = 0
+                is_numeric = False
+                try:
+                    if raw_c3 is not None and str(raw_c3).strip() != "":
+                        debt_cred = int(float(str(raw_c3).strip()))
+                        is_numeric = True
+                except (ValueError, TypeError):
+                    is_numeric = False
+
+                if is_numeric:
+                    is_ok = (debt_cred == 0)
+                else:
+                    # Kiểm tra chuỗi trạng thái
+                    if any(w in status_raw for w in ["nợ", "không", "chưa", "trượt", "bảo lưu", "ineligible"]):
+                        is_ok = False
+                        # Thử bóc tách số tín chỉ nợ từ text (nếu có)
+                        import re
+                        m = re.search(r"\d+", status_raw)
+                        if m:
+                            debt_cred = int(m.group(0))
+                    else:
+                        is_ok = True
+
                 total += 1
+                proj.debt_credits = debt_cred
 
                 if is_ok:
                     eligible_count += 1
                     proj.final_academic_eligibility = "ELIGIBLE"
-                    proj.final_academic_notes = note
-                    # Nếu GVHD đã duyệt đủ điều kiện và học vụ đạt -> Sẵn sàng bảo vệ
-                    if proj.supervisor_defense_confirmed or proj.is_eligible_for_defense:
-                        proj.is_eligible_for_defense = True
-                        proj.status = "DEFENSE_READY"
+                    proj.final_academic_notes = note or "Đủ điều kiện học vụ (Nợ 0 TC)"
+                    # GĐ 4 yeucau.md: Không nợ tín chỉ ──► Đủ điều kiện ──► Đẩy vào danh sách xếp Hội đồng bảo vệ
+                    proj.is_eligible_for_defense = True
+                    proj.status = "DEFENSE_READY"
+                    proj.deferral_status = "NONE"
                 else:
                     ineligible_count += 1
                     proj.final_academic_eligibility = "INELIGIBLE"
-                    proj.final_academic_notes = note or "Chưa đạt chuẩn đầu ra ngoại ngữ hoặc nợ học phí"
-                    # Chuyển sang chờ xét bảo lưu
-                    proj.deferral_status = "REQUESTED"
+                    proj.final_academic_notes = note or f"Bảo lưu do nợ {debt_cred or '> 0'} tín chỉ theo quy chế học vụ (GĐ 4)"
+                    # GĐ 4 yeucau.md: Nợ > 0 tín chỉ ──► Không đủ điều kiện ──► Chuyển trạng thái BẢO LƯU đồ án
+                    proj.status = "DEFERRED"
+                    proj.deferral_status = "APPROVED"
                     proj.deferral_reason = proj.final_academic_notes
+                    proj.deferral_decided_at = timezone.now()
+                    proj.is_eligible_for_defense = False
 
-                proj.save()
+                proj.save(update_fields=[
+                    "debt_credits", "final_academic_eligibility", "final_academic_notes",
+                    "status", "is_eligible_for_defense", "deferral_status",
+                    "deferral_reason", "deferral_decided_at"
+                ])
                 updated.append({
                     "registration_no": mssv,
                     "student_name": student.user.get_full_name(),

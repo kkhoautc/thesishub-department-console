@@ -205,6 +205,17 @@ export const CouncilsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteCouncil = async (councilId: number, councilName: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa "${councilName}"? Mọi phân công đồ án vào hội đồng này sẽ được reset.`)) return;
+    try {
+      await apiClient.delete(`/admin/councils/${councilId}/`);
+      alert(`Đã xóa thành công ${councilName}.`);
+      fetchData();
+    } catch (err: any) {
+      alert('Lỗi xóa hội đồng: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
   const addMemberSlot = () => {
     setSelectedMembers([...selectedMembers, { user_id: 0, role: 'MEMBER', external_institution: '' }]);
   };
@@ -340,8 +351,20 @@ export const CouncilsPage: React.FC = () => {
                             </div>
                           ))
                         ) : (
-                          <div className="text-muted text-xs">Chưa có thành viên nào.</div>
+                          <div className="text-muted text-xs" style={{ color: '#ef4444', fontWeight: 600 }}>⚠️ Chưa có thành viên nào. Hội đồng này sẽ bị bỏ qua khi phân bổ tự động.</div>
                         )}
+                      </div>
+
+                      <div style={{ marginTop: '0.85rem', display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', paddingTop: '0.65rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCouncil(council.id, council.council_name)}
+                          className="utc-btn-cancel"
+                          style={{ fontSize: '0.78rem', padding: '0.3rem 0.65rem', color: '#dc2626', borderColor: '#fca5a5', background: '#fff' }}
+                          title="Xóa hội đồng này"
+                        >
+                          🗑️ Xóa Hội Đồng
+                        </button>
                       </div>
                     </div>
                   );

@@ -707,3 +707,193 @@ class DocumentGenerationService:
         wb.save(buffer)
         buffer.seek(0)
         return buffer
+
+    @staticmethod
+    def generate_eligibility_report_excel(batch_id):
+        """
+        Giai đoạn 4: Xuất Báo cáo Hậu kiểm điều kiện học vụ bảo vệ ĐATN (Quy chế Nợ = 0 TC).
+        Báo cáo phân loại rõ ràng:
+        - Đủ điều kiện bảo vệ (Nợ = 0 TC)
+        - Bảo lưu đồ án (Nợ > 0 TC)
+        """
+        batch = AcademicBatch.objects.get(id=batch_id)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Hau_kiem_hoc_vu"
+
+        font_univ = Font(name="Times New Roman", size=10, bold=True)
+        font_title = Font(name="Times New Roman", size=13, bold=True)
+        font_subtitle = Font(name="Times New Roman", size=11, italic=True)
+        font_header = Font(name="Times New Roman", size=10, bold=True, color="FFFFFF")
+        font_data = Font(name="Times New Roman", size=10)
+        font_bold = Font(name="Times New Roman", size=10, bold=True)
+        fill_header = PatternFill(start_color="003366", end_color="003366", fill_type="solid")
+        fill_deferred = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid")
+        fill_passed = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+        fill_special = PatternFill(start_color="E0E7FF", end_color="E0E7FF", fill_type="solid")
+
+        align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        align_left = Alignment(horizontal="left", vertical="center")
+        align_right = Alignment(horizontal="right", vertical="center")
+        thin_border = Border(
+            left=Side(style="thin", color="CBD5E1"),
+            right=Side(style="thin", color="CBD5E1"),
+            top=Side(style="thin", color="CBD5E1"),
+            bottom=Side(style="thin", color="CBD5E1")
+        )
+
+        headers = [
+            ("STT", 6),
+            ("Mã SV", 13),
+            ("Họ và Tên", 22),
+            ("Lớp học phần", 16),
+            ("Hệ ĐT", 14),
+            ("Tên đề tài tốt nghiệp", 38),
+            ("GV Hướng Dẫn", 22),
+            ("Điểm QT (GVHD)", 14),
+            ("GPA Tích Lũy", 12),
+            ("Tín Chỉ Nợ", 12),
+            ("Kết Quả Hậu Kiểm", 22),
+            ("Trạng Thái Đồ Án", 16),
+            ("Ghi Chú", 30)
+        ]
+
+        # Banner
+        ws.merge_cells("A1:E1")
+        c_u1 = ws["A1"]
+        c_u1.value = "TRƯỜNG ĐẠI HỌC GIAO THÔNG VẬN TẢI\nKHOA CÔNG NGHỆ THÔNG TIN"
+        c_u1.font = font_univ
+        c_u1.alignment = align_center
+
+        ws.merge_cells("F1:M1")
+        c_u2 = ws["F1"]
+        c_u2.value = "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc"
+        c_u2.font = font_univ
+        c_u2.alignment = align_center
+
+        # Title
+        ws.merge_cells("A3:M3")
+        c_t = ws["A3"]
+        c_t.value = "BÁO CÁO HẬU KIỂM ĐIỀU KIỆN HỌC VỤ BẢO VỆ ĐỒ ÁN TỐT NGHIỆP"
+        c_t.font = font_title
+        c_t.alignment = align_center
+
+        ws.merge_cells("A4:M4")
+        c_sub = ws["A4"]
+        c_sub.value = f"Đợt: {batch.batch_name} ({batch.batch_code}) | Tiêu chuẩn: Sinh viên nợ tích lũy 0 TC đủ ĐK bảo vệ - Nợ > 0 TC bảo lưu"
+        c_sub.font = font_subtitle
+        c_sub.alignment = align_center
+
+        # Header Row
+        row_idx = 6
+        for col_idx, (hdr_text, col_w) in enumerate(headers, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=hdr_text)
+            cell.font = font_header
+            cell.fill = fill_header
+            cell.alignment = align_center
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = col_w
+
+        projects_list = list(
+            GraduationProject.objects.filter(batch=batch)
+            .select_related("student__user", "student__course_class", "supervisor__user")
+            .order_by("student__course_class__class_code", "student__registration_no")
+        )
+
+        eligible_count = 0
+        deferred_count = 0
+        force_count = 0
+
+        for stt, proj in enumerate(projects_list, start=1):
+            row_idx += 1
+            std = proj.student
+            user = std.user
+            full_name = user.get_full_name() or user.username
+            class_name = std.course_class.class_name if std.course_class else ""
+            sup_name = proj.supervisor.user.get_full_name() if proj.supervisor else ""
+
+            is_force = (proj.initial_eligibility == "FORCE_APPROVED")
+            is_deferred = (proj.deferral_status == "APPROVED" or proj.debt_credits > 0 or proj.status == "DEFERRED")
+            is_eligible = (proj.debt_credits == 0 and not is_deferred) or proj.is_eligible_for_defense or is_force
+
+            if is_force:
+                force_count += 1
+                result_text = "ĐẶC CÁCH BẢO VỆ"
+                fill_color = fill_special
+            elif is_eligible:
+                eligible_count += 1
+                result_text = "ĐỦ ĐIỀU KIỆN BẢO VỆ"
+                fill_color = fill_passed
+            else:
+                deferred_count += 1
+                result_text = "BẢO LƯU ĐỒ ÁN"
+                fill_color = fill_deferred
+
+            row_data = [
+                stt,
+                std.registration_no,
+                full_name,
+                class_name,
+                std.get_education_program_display(),
+                proj.topic_title_vi,
+                sup_name,
+                proj.supervisor_score if proj.supervisor_score is not None else "Chưa có",
+                proj.gpa_score if proj.gpa_score is not None else "",
+                proj.debt_credits,
+                result_text,
+                proj.get_status_display(),
+                proj.ineligibility_reason or proj.deferral_reason or ""
+            ]
+
+            for col_idx, val in enumerate(row_data, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=val)
+                cell.font = font_data
+                cell.border = thin_border
+                if col_idx in (1, 2, 4, 5, 8, 9, 10, 11, 12):
+                    cell.alignment = align_center
+                else:
+                    cell.alignment = align_left
+                if col_idx == 11:
+                    cell.fill = fill_color
+                    cell.font = font_bold
+
+        # Statistics block
+        row_idx += 2
+        total_st = len(projects_list)
+        ws.cell(row=row_idx, column=2, value="TỔNG SỐ SINH VIÊN:").font = font_bold
+        ws.cell(row=row_idx, column=3, value=f"{total_st} sinh viên").font = font_bold
+
+        row_idx += 1
+        ws.cell(row=row_idx, column=2, value="ĐỦ ĐIỀU KIỆN BẢO VỆ (NỢ 0 TC):").font = font_bold
+        c_el = ws.cell(row=row_idx, column=3, value=f"{eligible_count} sinh viên ({round((eligible_count/total_st)*100, 1) if total_st else 0}%)")
+        c_el.font = font_bold
+        c_el.fill = fill_passed
+
+        row_idx += 1
+        ws.cell(row=row_idx, column=2, value="BẢO LƯU ĐỒ ÁN (NỢ > 0 TC):").font = font_bold
+        c_df = ws.cell(row=row_idx, column=3, value=f"{deferred_count} sinh viên ({round((deferred_count/total_st)*100, 1) if total_st else 0}%)")
+        c_df.font = font_bold
+        c_df.fill = fill_deferred
+
+        if force_count > 0:
+            row_idx += 1
+            ws.cell(row=row_idx, column=2, value="ĐẶC CÁCH (FORCE APPROVE):").font = font_bold
+            ws.cell(row=row_idx, column=3, value=f"{force_count} sinh viên").font = font_bold
+
+        # Signatures
+        row_idx += 3
+        now_dt = timezone.now()
+        date_str = f"Hà Nội, ngày {now_dt.day} tháng {now_dt.month} năm {now_dt.year}"
+        ws.cell(row=row_idx, column=9, value=date_str).font = font_subtitle
+        row_idx += 1
+        ws.cell(row=row_idx, column=2, value="GIÁO VỤ KHOA CNTT").font = font_bold
+        ws.cell(row=row_idx, column=9, value="TRƯỞNG KHOA CNTT").font = font_bold
+        row_idx += 1
+        ws.cell(row=row_idx, column=2, value="(Ký và ghi rõ họ tên)").font = font_subtitle
+        ws.cell(row=row_idx, column=9, value="(Ký và ghi rõ họ tên)").font = font_subtitle
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
+

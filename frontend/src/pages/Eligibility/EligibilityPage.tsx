@@ -152,6 +152,24 @@ export const EligibilityPage: React.FC = () => {
     }
   };
 
+  const handleExportEligibility = async () => {
+    if (!selectedBatchId) return;
+    try {
+      const res = await apiClient.get(`/admin/eligibility/export-excel/?batch_id=${selectedBatchId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Bao_Cao_Hau_Kiem_Hoc_Vu_Dot_${selectedBatchId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      alert('Lỗi xuất file báo cáo hậu kiểm: ' + (err.message || 'Lỗi server'));
+    }
+  };
+
   const filtered = projects.filter((p) => {
     if (filterStatus === 'ALL') return true;
     return p.initial_eligibility === filterStatus;
@@ -168,8 +186,11 @@ export const EligibilityPage: React.FC = () => {
         {/* Header Bar */}
         <div className="utc-eligibility-header-bar">
           <div className="utc-eligibility-header-info">
-            <h3>Giai Đoạn 4: Xét Điều Kiện Làm Đồ Án & Force Approve (Bước 26 & 27)</h3>
-            <p>Rà soát điều kiện học vụ: Sinh viên đủ điều kiện làm đồ án hoặc Khoa quyết định Force Approve / Loại khỏi đợt</p>
+            <h3>Giai Đoạn 4: Hậu Kiểm Điều Kiện Học Vụ Trước Khi Bảo Vệ (Quy chế Nợ = 0 TC)</h3>
+            <p>
+              <strong>Quy chế UTC:</strong> Sau khi GVHD hoàn thành chấm điểm quá trình, Giáo vụ khoa hậu kiểm điều kiện học vụ:
+              Sinh viên nợ tích lũy <strong>0 tín chỉ</strong> mới đủ điều kiện bảo vệ. Sinh viên nợ &gt; 0 tín chỉ tự động chuyển trạng thái <strong>Bảo lưu đồ án</strong> (chờ đợt sau).
+            </p>
           </div>
 
           <div className="utc-header-actions">
@@ -186,14 +207,18 @@ export const EligibilityPage: React.FC = () => {
             </select>
 
             <button onClick={() => setShowImportModal(true)} className="utc-btn-emerald">
-              <span>📊</span> Import Điểm Xét ĐK (Excel)
+              <span>📊</span> Import Điểm &amp; Nợ TC (Excel)
+            </button>
+
+            <button onClick={handleExportEligibility} className="utc-btn-blue" style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '0.55rem 0.9rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span>📥</span> Xuất Báo Cáo Hậu Kiểm (Excel)
             </button>
 
             {countIneligible > 0 && (
               <button
                 onClick={handleBulkForceApproveIneligible}
                 className="utc-btn-force-bulk"
-                title="Đặc cách cho tất cả sinh viên không đủ điều kiện trong đợt"
+                title="Đặc cách cho tất cả sinh viên không đủ điều kiện học vụ trong đợt"
               >
                 <span>⭐</span> Force Approve Tất Cả ({countIneligible})
               </button>
@@ -216,27 +241,27 @@ export const EligibilityPage: React.FC = () => {
             className={`utc-elig-card ${filterStatus === 'ELIGIBLE' ? 'active' : ''}`}
             onClick={() => setFilterStatus('ELIGIBLE')}
           >
-            <span className="card-label">Đủ Điều Kiện Làm ĐA</span>
+            <span className="card-label">Nợ = 0 TC (Đủ ĐK Bảo Vệ)</span>
             <span className="card-num text-emerald">{countEligible}</span>
-            <span className="card-sub">Đi tiếp đến GĐ5 (Thực hiện)</span>
+            <span className="card-sub">Đủ điều kiện ra Hội đồng bảo vệ (GĐ 5)</span>
           </div>
 
           <div
             className={`utc-elig-card ${filterStatus === 'INELIGIBLE' ? 'active' : ''}`}
             onClick={() => setFilterStatus('INELIGIBLE')}
           >
-            <span className="card-label">Không Đủ Điều Kiện</span>
+            <span className="card-label">Nợ &gt; 0 TC (Bảo Lưu Đồ Án)</span>
             <span className="card-num text-amber">{countIneligible}</span>
-            <span className="card-sub">Chờ Khoa xét Force Approve</span>
+            <span className="card-sub">Tự động bảo lưu đồ án (chờ đợt sau)</span>
           </div>
 
           <div
             className={`utc-elig-card ${filterStatus === 'FORCE_APPROVED' ? 'active' : ''}`}
             onClick={() => setFilterStatus('FORCE_APPROVED')}
           >
-            <span className="card-label">Đã Đặc Cách (Force Approve)</span>
+            <span className="card-label">Khoa Đặc Cách (Force Approve)</span>
             <span className="card-num text-blue">{countForceApproved}</span>
-            <span className="card-sub">Khoa đã cho phép làm đồ án</span>
+            <span className="card-sub">Được đặc cách bảo vệ theo đơn</span>
           </div>
 
           <div
@@ -245,7 +270,7 @@ export const EligibilityPage: React.FC = () => {
           >
             <span className="card-label">Bị Loại Khỏi Đợt</span>
             <span className="card-num text-red">{countDisqualified}</span>
-            <span className="card-sub">Không được làm đồ án</span>
+            <span className="card-sub">Không đạt / Hủy kết quả</span>
           </div>
         </div>
 
@@ -268,10 +293,10 @@ export const EligibilityPage: React.FC = () => {
                     <th>MSSV</th>
                     <th>Sinh Viên</th>
                     <th>Hệ ĐT</th>
-                    <th>GPA</th>
-                    <th>Nợ Tín Chỉ</th>
-                    <th>Kết Luận Điều Kiện</th>
-                    <th>Lý Do / Ghi Chú</th>
+                    <th>GPA Tích Lũy</th>
+                    <th>Tín Chỉ Nợ (Quy chế = 0 TC)</th>
+                    <th>Kết Quả Hậu Kiểm GĐ 4</th>
+                    <th>Lý Do / Ghi Chú Học Vụ</th>
                     <th>Quyết Định Của Khoa</th>
                   </tr>
                 </thead>
@@ -289,18 +314,25 @@ export const EligibilityPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="font-bold text-center">{p.gpa_score !== null ? p.gpa_score : '—'}</td>
-                      <td className="text-center font-bold text-red-600">{p.debt_credits || 0}</td>
+                      <td className="text-center">
+                        <span className={`font-bold ${(p.debt_credits || 0) === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          {p.debt_credits || 0} TC
+                        </span>
+                        <div className="text-xs text-muted">
+                          {(p.debt_credits || 0) === 0 ? '✓ Nợ 0 TC (Đủ ĐK)' : `⚠ Nợ ${p.debt_credits} TC (> 0)`}
+                        </div>
+                      </td>
                       <td>
                         <span className={`utc-elig-pill pill-${(p.initial_eligibility || 'pending').toLowerCase()}`}>
                           {p.initial_eligibility === 'ELIGIBLE'
-                            ? '✅ Đủ Điều Kiện'
+                            ? '✅ Đủ ĐK Bảo Vệ (0 TC)'
                             : p.initial_eligibility === 'FORCE_APPROVED'
-                            ? '⭐ Đặc Cách (Force Approve)'
+                            ? '⭐ Khoa Đặc Cách Bảo Vệ'
                             : p.initial_eligibility === 'DISQUALIFIED'
                             ? '🚫 Bị Loại Khỏi Đợt'
                             : p.initial_eligibility === 'INELIGIBLE'
-                            ? '⚠️ Không Đủ Điều Kiện'
-                            : '⏳ Chưa Xét'}
+                            ? '⚠️ Bảo Lưu Đồ Án (Nợ > 0 TC)'
+                            : '⏳ Chưa Hậu Kiểm'}
                         </span>
                       </td>
                       <td style={{ maxWidth: '250px' }}>
